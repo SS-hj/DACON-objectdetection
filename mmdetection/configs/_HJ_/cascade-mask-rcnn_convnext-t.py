@@ -4,10 +4,8 @@ _base_ = [
     './_base_/schedules/schedule_1x.py', './_base_/default_runtime.py'
 ]
 
-# TODO: delete custom_imports after mmcls supports auto import
-# please install mmcls>=1.0
-# import mmcls.models to trigger register_module in mmcls
 custom_imports = dict(imports=['mmcls.models'], allow_failed_imports=False)
+load_from = 'https://download.openmmlab.com/mmdetection/v2.0/convnext/cascade_mask_rcnn_convnext-t_p4_w7_fpn_giou_4conv1f_fp16_ms-crop_3x_coco/cascade_mask_rcnn_convnext-t_p4_w7_fpn_giou_4conv1f_fp16_ms-crop_3x_coco_20220509_204200-8f07c40b.pth'
 checkpoint_file = 'https://download.openmmlab.com/mmclassification/v0/convnext/downstream/convnext-tiny_3rdparty_32xb128-noema_in1k_20220301-795e9634.pth'  # noqa
 
 model = dict(
@@ -39,7 +37,7 @@ model = dict(
                 target_stds=[0.1, 0.1, 0.2, 0.2]),
             reg_class_agnostic=False,
             reg_decoded_bbox=True,
-            norm_cfg=dict(type='SyncBN', requires_grad=True),
+            norm_cfg=dict(type='BN', requires_grad=True),
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(type='GIoULoss', loss_weight=10.0)),
@@ -58,7 +56,7 @@ model = dict(
                 target_stds=[0.05, 0.05, 0.1, 0.1]),
             reg_class_agnostic=False,
             reg_decoded_bbox=True,
-            norm_cfg=dict(type='SyncBN', requires_grad=True),
+            norm_cfg=dict(type='BN', requires_grad=True),
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(type='GIoULoss', loss_weight=10.0)),
@@ -77,78 +75,74 @@ model = dict(
                 target_stds=[0.033, 0.033, 0.067, 0.067]),
             reg_class_agnostic=False,
             reg_decoded_bbox=True,
-            norm_cfg=dict(type='SyncBN', requires_grad=True),
+            norm_cfg=dict(type='BN', requires_grad=True),
             loss_cls=dict(
                 type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0),
             loss_bbox=dict(type='GIoULoss', loss_weight=10.0))
     ]))
 
+img_norm_cfg = dict(
+    mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
+
 # augmentation strategy originates from DETR / Sparse RCNN
 train_pipeline = [
-    dict(type='LoadImageFromFile', backend_args={{_base_.backend_args}}),
+    dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', with_bbox=True),
-    dict(type='RandomFlip', prob=0.5),
+    dict(type='RandomFlip', flip_ratio=0.5),
     dict(
-        type='RandomChoice',
-        transforms=[[
+        type='AutoAugment',
+        policies=[[
             dict(
-                type='RandomChoiceResize',
-                scales=[(480, 1333), (512, 1333), (544, 1333), (576, 1333),
-                        (608, 1333), (640, 1333), (672, 1333), (704, 1333),
-                        (736, 1333), (768, 1333), (800, 1333)],
+                type='Resize',
+                img_scale=[(480, 1333), (512, 1333), (544, 1333), (576, 1333),
+                           (608, 1333), (640, 1333), (672, 1333), (704, 1333),
+                           (736, 1333), (768, 1333), (800, 1333)],
+                multiscale_mode='value',
                 keep_ratio=True)
         ],
-                    [
-                        dict(
-                            type='RandomChoiceResize',
-                            scales=[(400, 1333), (500, 1333), (600, 1333)],
-                            keep_ratio=True),
-                        dict(
-                            type='RandomCrop',
-                            crop_type='absolute_range',
-                            crop_size=(384, 600),
-                            allow_negative_crop=True),
-                        dict(
-                            type='RandomChoiceResize',
-                            scales=[(480, 1333), (512, 1333), (544, 1333),
-                                    (576, 1333), (608, 1333), (640, 1333),
-                                    (672, 1333), (704, 1333), (736, 1333),
-                                    (768, 1333), (800, 1333)],
-                            keep_ratio=True)
-                    ]]),
-    dict(type='PackDetInputs')
+                  [
+                      dict(
+                          type='Resize',
+                          img_scale=[(400, 1333), (500, 1333), (600, 1333)],
+                          multiscale_mode='value',
+                          keep_ratio=True),
+                      dict(
+                          type='RandomCrop',
+                          crop_type='absolute_range',
+                          crop_size=(384, 600),
+                          allow_negative_crop=True),
+                      dict(
+                          type='Resize',
+                          img_scale=[(480, 1333), (512, 1333), (544, 1333),
+                                     (576, 1333), (608, 1333), (640, 1333),
+                                     (672, 1333), (704, 1333), (736, 1333),
+                                     (768, 1333), (800, 1333)],
+                          multiscale_mode='value',
+                          override=True,
+                          keep_ratio=True)
+                  ]]),
+    dict(type='Normalize', **img_norm_cfg),
+    dict(type='Pad', size_divisor=32),
+    dict(type='DefaultFormatBundle'),
+    dict(type='Collect', keys=['img', 'gt_bboxes', 'gt_labels']),
 ]
-train_dataloader = dict(dataset=dict(pipeline=train_pipeline))
+data = dict(train=dict(pipeline=train_pipeline), persistent_workers=True)
 
-max_epochs = 36
-train_cfg = dict(max_epochs=max_epochs)
-
-# learning rate
-param_scheduler = [
-    dict(
-        type='LinearLR', start_factor=0.001, by_epoch=False, begin=0,
-        end=1000),
-    dict(
-        type='MultiStepLR',
-        begin=0,
-        end=max_epochs,
-        by_epoch=True,
-        milestones=[27, 33],
-        gamma=0.1)
-]
-
-# Enable automatic-mixed-precision training with AmpOptimWrapper.
-optim_wrapper = dict(
-    type='AmpOptimWrapper',
+optimizer = dict(
+    _delete_=True,
     constructor='LearningRateDecayOptimizerConstructor',
+    type='AdamW',
+    lr=0.0002,
+    betas=(0.9, 0.999),
+    weight_decay=0.05,
     paramwise_cfg={
         'decay_rate': 0.7,
         'decay_type': 'layer_wise',
         'num_layers': 6
-    },
-    optimizer=dict(
-        _delete_=True,
-        type='AdamW',
-        lr=0.0002,
-        betas=(0.9, 0.999),
-        weight_decay=0.05))
+    })
+
+lr_config = dict(warmup_iters=1000, step=[27, 33])
+runner = dict(max_epochs=36)
+
+# you need to set mode='dynamic' if you are using pytorch<=1.5.0
+fp16 = dict(loss_scale=dict(init_scale=512))
