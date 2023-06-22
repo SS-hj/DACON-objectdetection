@@ -61,6 +61,7 @@ def parse_args():
     parser.add_argument(
         '--deterministic',
         action='store_true',
+        default=True,
         help='whether to set deterministic options for CUDNN backend.')
     parser.add_argument(
         '--options',
