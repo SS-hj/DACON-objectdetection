@@ -18,9 +18,8 @@ from mmdet.apis import init_random_seed, set_random_seed, train_detector
 from mmdet.datasets import build_dataset
 from mmdet.models import build_detector
 from mmdet.utils import (collect_env, get_device, get_root_logger,
-                         replace_cfg_vals, rfnext_init_model,
-                         setup_multi_processes, update_data_root)
-
+                         replace_cfg_vals, setup_multi_processes,
+                         update_data_root)
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Train a detector')
@@ -54,7 +53,7 @@ def parse_args():
         default=0,
         help='id of gpu to use '
         '(only applicable to non-distributed training)')
-    parser.add_argument('--seed', type=int, default=None, help='random seed')
+    parser.add_argument('--seed', type=int, default=777, help='random seed')
     parser.add_argument(
         '--diff-seed',
         action='store_true',
@@ -214,9 +213,6 @@ def main():
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
-
-    # init rfnext if 'RFSearchHook' is defined in cfg
-    rfnext_init_model(model, cfg=cfg)
 
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
