@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'CocoDataset'
-data_root = '/opt/ml/DACON-objectdetection/data/'
+data_root = '../data/'
 
 classes = ('chevrolet_malibu_sedan_2012_2016', 'chevrolet_malibu_sedan_2017_2019', 'chevrolet_spark_hatchback_2016_2021', 
            'chevrolet_trailblazer_suv_2021_', 'chevrolet_trax_suv_2017_2019','genesis_g80_sedan_2016_2020','genesis_g80_sedan_2021_', 
